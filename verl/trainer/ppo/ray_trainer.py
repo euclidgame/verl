@@ -36,6 +36,7 @@ from omegaconf import OmegaConf, open_dict
 from torch.utils.data import Dataset, Sampler
 from torchdata.stateful_dataloader import StatefulDataLoader
 from tqdm import tqdm
+import time
 
 from verl import DataProto
 from verl.experimental.dataset.sampler import AbstractCurriculumSampler
@@ -679,20 +680,34 @@ class RayPPOTrainer:
             }
             print(f"test_gen_batch meta info: {test_gen_batch.meta_info}")
 
+            print("Starting validation phase")
+
+            _val_start_t = time.time()
+
             # pad to be divisible by dp_size
             size_divisor = (
                 self.actor_rollout_wg.world_size
                 if not self.async_rollout_mode
                 else self.config.actor_rollout_ref.rollout.agent.num_workers
             )
+            _pad_t0 = time.time()
             test_gen_batch_padded, pad_size = pad_dataproto_to_divisor(test_gen_batch, size_divisor)
+            print(
+                f"[VAL] pad_dataproto_to_divisor took {time.time() - _pad_t0:.2f}s | pad_size={pad_size} | divisor={size_divisor}"
+            )
             if not self.async_rollout_mode:
+                _gen_t0 = time.time()
                 test_output_gen_batch_padded = self.actor_rollout_wg.generate_sequences(test_gen_batch_padded)
+                print(f"[VAL] actor_rollout_wg.generate_sequences took {time.time() - _gen_t0:.2f}s")
             else:
+                _gen_t0 = time.time()
                 test_output_gen_batch_padded = self.async_rollout_manager.generate_sequences(test_gen_batch_padded)
+                print(f"[VAL] async_rollout_manager.generate_sequences took {time.time() - _gen_t0:.2f}s")
 
             # unpad
+            _unpad_t0 = time.time()
             test_output_gen_batch = unpad_dataproto(test_output_gen_batch_padded, pad_size=pad_size)
+            print(f"[VAL] unpad_dataproto took {time.time() - _unpad_t0:.2f}s | total validation gen time {time.time() - _val_start_t:.2f}s")
 
             print("validation generation end")
 
@@ -707,7 +722,9 @@ class RayPPOTrainer:
             # evaluate using reward_function
             if self.val_reward_fn is None:
                 raise ValueError("val_reward_fn must be provided for validation.")
+            print("Evaluating reward function...")
             result = self.val_reward_fn(test_batch, return_dict=True)
+            print("Successfully evaluated reward function...")
             reward_tensor = result["reward_tensor"]
             scores = reward_tensor.sum(-1).cpu().tolist()
             sample_scores.extend(scores)
