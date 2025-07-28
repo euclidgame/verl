@@ -37,6 +37,8 @@ if [ $USE_MEGATRON -eq 1 ]; then
     echo "Notice that TransformerEngine installation can take very long time, please be patient"
     NVTE_FRAMEWORK=pytorch uv pip install --no-deps git+https://github.com/NVIDIA/TransformerEngine.git@v2.2.1
     uv pip install --no-deps git+https://github.com/NVIDIA/Megatron-LM.git@core_v0.12.2
+fi
+
 
 echo "5. May need to fix opencv"
 uv pip install opencv-python
