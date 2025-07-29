@@ -80,14 +80,12 @@ class NaiveRewardManager:
             num_turns = data_item.non_tensor_batch.get("__num_turns__", None)
             extra_info["num_turns"] = num_turns
 
-            print("Starting to compute score...")
             score = self.compute_score(
                 data_source=data_source,
                 solution_str=response_str,
                 ground_truth=ground_truth,
                 extra_info=extra_info,
             )
-            print("Finished computing score...")
 
             if isinstance(score, dict):
                 reward = score["score"]
