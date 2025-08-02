@@ -20,6 +20,13 @@ reward_model.enable=false   # skip local RewardModelWorker
 custom_reward_function:
   path: examples/reward/olympic_api_scorer.py
   name: compute_score
+  reward_kwargs:
+    model_name: o3  # or any other OpenAI model name (e.g., o3-mini, gpt-4)
+```
+
+You can override the model name from command line:
+```
+python -m verl.trainer.main_ppo ... custom_reward_function.reward_kwargs.model_name=o3-mini
 ```
 
 Environment variables:
@@ -78,7 +85,7 @@ Your input will consist of the following components:
 def get_evaluation_result(problem: str, solution: str, model_name: str = "o3") -> Optional[str]:
     prompt = prompt_template.format(problem=problem, solution=solution)
     try:
-        response = client.chat.completions.create(
+        response = client.with_options(max_retries=5, timeout=600).chat.completions.create(
             model=model_name,
             messages=[
                 {
@@ -86,16 +93,12 @@ def get_evaluation_result(problem: str, solution: str, model_name: str = "o3") -
                     "content": prompt
                 }
             ],
-            timeout=600,
             response_format={"type": "json_object"}
         )
         return response.choices[0].message.content
     except Exception as e:
         print(f"Error getting evaluation result: {e}")
         return None
-
-def get_evaluation_result_gemini(problem: str, solution: str, model_name: str = "gemini-2.0-flash-001") -> Optional[str]:
-    pass
 
 def extract_evaluation_result(result: Optional[str]) -> float:
     if result is None:
@@ -107,13 +110,13 @@ def extract_evaluation_result(result: Optional[str]) -> float:
         return 0.0
 
 
-def compute_score(*, data_source: str, solution_str: str, ground_truth=None, extra_info: dict | None = None):
+def compute_score(*, data_source: str, solution_str: str, ground_truth=None, extra_info: dict | None = None, model_name: str = 'o3'):
     if '</think>' in solution_str:
         solution_str = solution_str.split('</think>')[1]
     else:
         return 0.0
 
-    result = get_evaluation_result(extra_info['question'], solution_str)
+    result = get_evaluation_result(extra_info['question'], solution_str, model_name=model_name)
     return extract_evaluation_result(result)
 
 def compute_score_batch(
@@ -121,6 +124,7 @@ def compute_score_batch(
     solution_strs: List[str],
     ground_truths: List[str],
     extra_infos: List[dict],
+    model_name: str = 'o3',
 ) -> List[float]:
     """Batched wrapper around ``compute_score`` using a thread pool.
 
@@ -140,6 +144,7 @@ def compute_score_batch(
                 solution_str=solution_str,
                 ground_truth=ground_truth,
                 extra_info=extra_info,
+                model_name=model_name,
             )
             futures.append(future)
 

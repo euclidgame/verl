@@ -1,0 +1,30 @@
+# Example config for training with olympic dataset and custom reward scorer
+defaults:
+  - _self_
+  - /verl/trainer/config/ppo_trainer
+
+# Disable the default reward model since we're using custom scoring
+reward_model:
+  enable: false
+
+# Configure the custom reward function
+custom_reward_function:
+  path: examples/reward/olympic_api_scorer.py
+  name: compute_score
+  # Add reward_kwargs with + prefix since it's not in the base config
+  +reward_kwargs:
+    model_name: gpt-4o  # or o3-mini, o3, etc.
+
+# Example data configuration for the olympic dataset
+data:
+  train_files: 
+    - train.parquet
+  test_files:
+    - test.parquet
+  # Add other data configuration as needed
+
+# You can add other overrides here as needed
+# For example:
+# trainer:
+#   total_epochs: 3
+#   ... 
